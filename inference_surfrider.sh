@@ -1,0 +1,2 @@
+export CUDA_VISIBLE_DEVICES=2
+python src/demo.py mot --load_model exp/mot/surfrider_dla34_140_epochs/model_140.pth --conf_thres 0.4 --input-video videos/T1_1080_px_converted_12fps.mp4 --output-root ./surfrider_T1

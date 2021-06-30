@@ -12,7 +12,7 @@ from tracking_utils.utils import mkdir_if_missing
 from tracking_utils.log import logger
 import datasets.dataset.jde as datasets
 from track import eval_seq
-
+import pickle
 
 logger.setLevel(logging.INFO)
 
@@ -22,14 +22,27 @@ def demo(opt):
     mkdir_if_missing(result_root)
 
     logger.info('Starting tracking...')
-    dataloader = datasets.LoadVideo(opt.input_video, opt.img_size)
+
+    if len(opt.input_video):
+        dataloader = datasets.LoadVideo(opt.input_video, opt.img_size, skip_frames=1)
+    else: 
+        dataloader = datasets.LoadImages
     result_filename = os.path.join(result_root, 'results.txt')
     frame_rate = dataloader.frame_rate
 
     frame_dir = None if opt.output_format == 'text' else osp.join(result_root, 'frame')
-    eval_seq(opt, dataloader, 'mot', result_filename,
+    _, _, _, detections_to_save = eval_seq(opt, dataloader, 'mot', result_filename,
              save_dir=frame_dir, show_image=False, frame_rate=frame_rate,
              use_cuda=opt.gpus!=[-1])
+
+    with open('saved_frames.pickle','wb') as f:
+        pickle.dump(dataloader.frames_to_save, f)
+
+    # with open('saved_heatmaps.pickle','wb') as f:
+    #     pickle.dump(heatmaps_to_save, f)
+
+    with open('saved_detections.pickle','wb') as f:
+        pickle.dump(detections_to_save, f)
 
     if opt.output_format == 'video':
         output_video_path = osp.join(result_root, 'MOT16-03-results.mp4')

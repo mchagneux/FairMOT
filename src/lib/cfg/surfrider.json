@@ -1,0 +1,17 @@
+{
+    "root":"/home/infres/chagneux/repos/FairMOT/src/data/surfrider",
+
+    "train":
+    {
+        "surfrider_train":"./data/surfrider.train",
+        "surfrider_test":"./data/surfrider.val"
+    },
+    "test_emb":
+    {
+        "surfrider":"./data/surfrider.val"
+    },
+    "test":
+    {
+        "surfrider":"./data/surfrider.val"
+    }
+}

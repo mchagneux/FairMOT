@@ -84,19 +84,21 @@ class LoadImages:  # for inference
 
 
 class LoadVideo:  # for inference
-    def __init__(self, path, img_size=(1088, 608)):
+    def __init__(self, path, img_size=(1088, 608), skip_frames=0):
         self.cap = cv2.VideoCapture(path)
-        self.frame_rate = int(round(self.cap.get(cv2.CAP_PROP_FPS)))
+        self.skip_frames = skip_frames
+
+        self.frame_rate = int(round(self.cap.get(cv2.CAP_PROP_FPS)))/(self.skip_frames+1)
         self.vw = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.vh = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        self.vn = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
+        self.vn = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT)/(self.skip_frames+1))
         self.width = img_size[0]
         self.height = img_size[1]
         self.count = 0
 
         self.w, self.h = 1920, 1080
         print('Lenth of the video: {:d} frames'.format(self.vn))
+        self.frames_to_save = []
 
     def get_size(self, vw, vh, dw, dh):
         wa, ha = float(dw) / vw, float(dh) / vh
@@ -111,13 +113,15 @@ class LoadVideo:  # for inference
         self.count += 1
         if self.count == len(self):
             raise StopIteration
-        # Read image
         res, img0 = self.cap.read()  # BGR
+        for _ in range(self.skip_frames):
+            self.cap.read()    
         assert img0 is not None, 'Failed to load frame {:d}'.format(self.count)
+        self.frames_to_save.append(cv2.resize(img0,(480,270)))
         img0 = cv2.resize(img0, (self.w, self.h))
 
         # Padded resize
-        img, _, _, _ = letterbox(img0, height=self.height, width=self.width)
+        img, _ , _ , _ = letterbox(img0, height=self.height, width=self.width)
 
         # Normalize RGB
         img = img[:, :, ::-1].transpose(2, 0, 1)
@@ -138,7 +142,7 @@ class LoadImagesAndLabels:  # for training
             self.img_files = [x.replace('\n', '') for x in self.img_files]
             self.img_files = list(filter(lambda x: len(x) > 0, self.img_files))
 
-        self.label_files = [x.replace('images', 'labels_with_ids').replace('.png', '.txt').replace('.jpg', '.txt')
+        self.label_files = [x.replace('images', 'labels_with_ids').replace('.png', '.txt').replace('.jpg', '.txt').replace('.jpeg','.txt').replace('.JPG','.txt')
                             for x in self.img_files]
 
         self.nF = len(self.img_files)  # number of image files
@@ -349,6 +353,23 @@ def collate_fn(batch):
 
     return imgs, filled_labels, paths, sizes, labels_len.unsqueeze(1)
 
+def collate_fn_detdataset(batch):
+    imgs, labels, paths, sizes, hms = zip(*batch)
+    batch_size = len(labels)
+    imgs = torch.stack(imgs, 0)
+    max_box_len = max([l.shape[0] for l in labels])
+    labels = [torch.from_numpy(l) for l in labels]
+    filled_labels = torch.zeros(batch_size, max_box_len, 6)
+    labels_len = torch.zeros(batch_size)
+    hms = np.concatenate(hms)
+
+    for i in range(batch_size):
+        isize = labels[i].shape[0]
+        if len(labels[i]) > 0:
+            filled_labels[i, :isize, :] = labels[i]
+        labels_len[i] = isize
+
+    return imgs, filled_labels, paths, sizes, labels_len.unsqueeze(1), hms
 
 class JointDataset(LoadImagesAndLabels):  # for training
     default_resolution = [1088, 608]
@@ -372,7 +393,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 self.img_files[ds] = list(filter(lambda x: len(x) > 0, self.img_files[ds]))
 
             self.label_files[ds] = [
-                x.replace('images', 'labels_with_ids').replace('.png', '.txt').replace('.jpg', '.txt')
+                x.replace('images', 'labels_with_ids').replace('.png', '.txt').replace('.jpg', '.txt').replace('.jpeg', '.txt').replace('.JPG', '.txt')
                 for x in self.img_files[ds]]
 
         for ds, label_paths in self.label_files.items():
@@ -426,6 +447,8 @@ class JointDataset(LoadImagesAndLabels):  # for training
         for i, _ in enumerate(labels):
             if labels[i, 1] > -1:
                 labels[i, 1] += self.tid_start_index[ds]
+
+
 
         output_h = imgs.shape[1] // self.opt.down_ratio
         output_w = imgs.shape[2] // self.opt.down_ratio
@@ -490,13 +513,15 @@ class JointDataset(LoadImagesAndLabels):  # for training
 
 
 class DetDataset(LoadImagesAndLabels):  # for training
-    def __init__(self, root, paths, img_size=(1088, 608), augment=False, transforms=None):
+    def __init__(self, root, paths, opt, img_size=(1088, 608), augment=False, transforms=None):
 
         dataset_names = paths.keys()
         self.img_files = OrderedDict()
         self.label_files = OrderedDict()
         self.tid_num = OrderedDict()
         self.tid_start_index = OrderedDict()
+        self.opt = opt
+        self.num_classes = 1
         for ds, path in paths.items():
             with open(path, 'r') as file:
                 self.img_files[ds] = file.readlines()
@@ -504,7 +529,7 @@ class DetDataset(LoadImagesAndLabels):  # for training
                 self.img_files[ds] = list(filter(lambda x: len(x) > 0, self.img_files[ds]))
 
             self.label_files[ds] = [
-                x.replace('images', 'labels_with_ids').replace('.png', '.txt').replace('.jpg', '.txt')
+                x.replace('images', 'labels_with_ids').replace('.png', '.txt').replace('.jpg', '.txt').replace('.jpeg', '.txt').replace('.JPG', '.txt')
                 for x in self.img_files[ds]]
 
         for ds, label_paths in self.label_files.items():
@@ -560,6 +585,47 @@ class DetDataset(LoadImagesAndLabels):  # for training
             if labels[i, 1] > -1:
                 labels[i, 1] += self.tid_start_index[ds]
 
-        return imgs, labels0, img_path, (h, w)
+
+        output_h = imgs.shape[1] // self.opt.down_ratio
+        output_w = imgs.shape[2] // self.opt.down_ratio
+        num_classes = self.num_classes
+        num_objs = labels.shape[0]
+        hm = np.zeros((num_classes, output_h, output_w), dtype=np.float32)
+
+        draw_gaussian = draw_msra_gaussian if self.opt.mse_loss else draw_umich_gaussian
+        for k in range(num_objs):
+            label = labels[k]
+            bbox = label[2:]
+            cls_id = int(label[0])
+            bbox[[0, 2]] = bbox[[0, 2]] * output_w
+            bbox[[1, 3]] = bbox[[1, 3]] * output_h
+            bbox_amodal = copy.deepcopy(bbox)
+            bbox_amodal[0] = bbox_amodal[0] - bbox_amodal[2] / 2.
+            bbox_amodal[1] = bbox_amodal[1] - bbox_amodal[3] / 2.
+            bbox_amodal[2] = bbox_amodal[0] + bbox_amodal[2]
+            bbox_amodal[3] = bbox_amodal[1] + bbox_amodal[3]
+            bbox[0] = np.clip(bbox[0], 0, output_w - 1)
+            bbox[1] = np.clip(bbox[1], 0, output_h - 1)
+            h = bbox[3]
+            w = bbox[2]
+
+            bbox_xy = copy.deepcopy(bbox)
+            bbox_xy[0] = bbox_xy[0] - bbox_xy[2] / 2
+            bbox_xy[1] = bbox_xy[1] - bbox_xy[3] / 2
+            bbox_xy[2] = bbox_xy[0] + bbox_xy[2]
+            bbox_xy[3] = bbox_xy[1] + bbox_xy[3]
+
+            if h > 0 and w > 0:
+                radius = gaussian_radius((math.ceil(h), math.ceil(w)))
+                radius = max(0, int(radius))
+                radius = 6 if self.opt.mse_loss else radius
+                #radius = max(1, int(radius)) if self.opt.mse_loss else radius
+                ct = np.array(
+                    [bbox[0], bbox[1]], dtype=np.float32)
+                ct_int = ct.astype(np.int32)
+                draw_gaussian(hm[cls_id], ct_int, radius)
+
+
+        return imgs, labels0, img_path, (h, w), hm
 
 

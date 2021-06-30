@@ -11,6 +11,7 @@ import argparse
 import motmetrics as mm
 import numpy as np
 import torch
+import pickle 
 
 from tracker.multitracker import JDETracker
 from tracking_utils import visualization as vis
@@ -95,7 +96,8 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
             tlwh = t.tlwh
             tid = t.track_id
             vertical = tlwh[2] / tlwh[3] > 1.6
-            if tlwh[2] * tlwh[3] > opt.min_box_area and not vertical:
+            if True: # tlwh[2] * tlwh[3] > opt.min_box_area and not vertical:
+
                 online_tlwhs.append(tlwh)
                 online_ids.append(tid)
                 #online_scores.append(t.score)
@@ -108,13 +110,20 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
                                           fps=1. / timer.average_time)
         if show_image:
             cv2.imshow('online_im', online_im)
+            # cv2.waitKey(0)
         if save_dir is not None:
             cv2.imwrite(os.path.join(save_dir, '{:05d}.jpg'.format(frame_id)), online_im)
         frame_id += 1
-    # save results
+
+    # # save results
+    # with open('detections.pickle','wb') as f: 
+    #     pickle.dump(tracker.detections_to_save, f)
+    # with open('heatmaps.pickle','wb') as f:
+    #     pickle.dump(tracker.heatmaps_to_save, f)
+        
     write_results(result_filename, results, data_type)
     #write_results_score(result_filename, results, data_type)
-    return frame_id, timer.average_time, timer.calls
+    return frame_id, timer.average_time, timer.calls, tracker.detections_to_save
 
 
 def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), exp_name='demo',

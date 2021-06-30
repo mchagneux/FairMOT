@@ -15,12 +15,12 @@ from scipy import interpolate
 import numpy as np
 from torchvision.transforms import transforms as T
 from models.model import create_model, load_model
-from datasets.dataset.jde import DetDataset, collate_fn
+from datasets.dataset.jde import DetDataset, collate_fn, collate_fn_detdataset
 from utils.utils import xywh2xyxy, ap_per_class, bbox_iou
 from opts import opts
 from models.decode import mot_decode
 from utils.post_process import ctdet_post_process
-
+import pickle
 
 def post_process(opt, dets, meta):
     dets = dets.detach().cpu().numpy()
@@ -75,17 +75,21 @@ def test_det(
     model = model.to(opt.device)
     model.eval()
 
+    detections_to_save = []
+    labels_to_save = []
+    gt_heatmaps_to_save = []
+    heatmaps_to_save = []
     # Get dataloader
     transforms = T.Compose([T.ToTensor()])
-    dataset = DetDataset(dataset_root, test_path, img_size, augment=False, transforms=transforms)
+    dataset = DetDataset(dataset_root, test_path ,opt, img_size, augment=False,  transforms=transforms)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False,
-                                             num_workers=8, drop_last=False, collate_fn=collate_fn)
+                                             num_workers=8, drop_last=False, collate_fn=collate_fn_detdataset)
     mean_mAP, mean_R, mean_P, seen = 0.0, 0.0, 0.0, 0
     print('%11s' * 5 % ('Image', 'Total', 'P', 'R', 'mAP'))
     outputs, mAPs, mR, mP, TP, confidence, pred_class, target_class, jdict = \
         [], [], [], [], [], [], [], [], []
     AP_accum, AP_accum_count = np.zeros(nC), np.zeros(nC)
-    for batch_i, (imgs, targets, paths, shapes, targets_len) in enumerate(dataloader):
+    for batch_i, (imgs, targets, paths, shapes, targets_len, gt_hms) in enumerate(dataloader):
         t = time.time()
         #seen += batch_size
 
@@ -101,6 +105,7 @@ def test_det(
                 'out_height': inp_height // opt.down_ratio,
                 'out_width': inp_width // opt.down_ratio}
         hm = output['hm'].sigmoid_()
+        # heatmaps_to_save.append(hm.cpu().numpy())
         wh = output['wh']
         reg = output['reg'] if opt.reg_offset else None
         opt.K = 200
@@ -115,7 +120,9 @@ def test_det(
             dets = dets.unsqueeze(0)
             dets = post_process(opt, dets, meta)
             dets = merge_outputs(opt, [dets])[1]
-
+            detections_to_save.append(dets)
+            gt_heatmaps_to_save.append(gt_hms[si])
+            heatmaps_to_save.append(hm[si][0].cpu().numpy())
             #remain_inds = dets[:, 4] > opt.det_thres
             #dets = dets[remain_inds]
             if dets is None:
@@ -129,6 +136,8 @@ def test_det(
             if labels.size(0) == 0:
                 # correct.extend([0 for _ in range(len(detections))])
                 mAPs.append(0), mR.append(0), mP.append(0)
+
+                labels_to_save.append([])
                 continue
             else:
                 target_cls = labels[:, 0]
@@ -139,6 +148,7 @@ def test_det(
                 target_boxes[:, 2] *= width
                 target_boxes[:, 1] *= height
                 target_boxes[:, 3] *= height
+                labels_to_save.append([target_boxes,width,height])
 
                 '''
                 path = paths[si]
@@ -204,12 +214,18 @@ def test_det(
     print('%11s' * 5 % ('Image', 'Total', 'P', 'R', 'mAP'))
 
     print('AP: %-.4f\n\n' % (AP_accum[0] / (AP_accum_count[0] + 1E-16)))
-
-    # Return mAP
-    return mean_mAP, mean_R, mean_P
+    with open('saved_detections.pickle','wb') as f: 
+        pickle.dump(detections_to_save, f)
+    with open('saved_labels.pickle','wb') as f: 
+        pickle.dump(labels_to_save, f)
+    with open('saved_heatmaps.pickle','wb') as f: 
+        pickle.dump(heatmaps_to_save, f)
+    with open('saved_gt_heatmaps.pickle','wb') as f: 
+        pickle.dump(gt_heatmaps_to_save, f)
+    return mean_mAP, mean_R, mean_P # Return mAP
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
     opt = opts().init()
     with torch.no_grad():
         map = test_det(opt, batch_size=4)

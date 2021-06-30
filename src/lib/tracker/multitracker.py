@@ -199,6 +199,8 @@ class JDETracker(object):
 
         self.kalman_filter = KalmanFilter()
 
+        self.detections_to_save = []
+
     def post_process(self, dets, meta):
         dets = dets.detach().cpu().numpy()
         dets = dets.reshape(1, -1, dets.shape[2])
@@ -261,6 +263,7 @@ class JDETracker(object):
 
         remain_inds = dets[:, 4] > self.opt.conf_thres
         dets = dets[remain_inds]
+
         id_feature = id_feature[remain_inds]
 
         # vis
@@ -277,10 +280,13 @@ class JDETracker(object):
 
         if len(dets) > 0:
             '''Detections'''
+            self.detections_to_save.append(dets)
             detections = [STrack(STrack.tlbr_to_tlwh(tlbrs[:4]), tlbrs[4], f, 30) for
                           (tlbrs, f) in zip(dets[:, :5], id_feature)]
         else:
             detections = []
+            self.detections_to_save.append([])
+
 
         ''' Add newly detected tracklets to tracked_stracks'''
         unconfirmed = []

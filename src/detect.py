@@ -154,7 +154,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
     opt = opts().init()
     if opt.val_hie:
         seqs_str = '''1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19'''

@@ -22,6 +22,7 @@ def main(opt):
     torch.manual_seed(opt.seed)
     torch.backends.cudnn.benchmark = not opt.not_cuda_benchmark and not opt.test
 
+    print(torch.cuda.current_device())
     print('Setting up data...')
     Dataset = get_dataset(opt.dataset, opt.task)
     f = open(opt.data_cfg)
@@ -93,6 +94,6 @@ def main(opt):
 
 
 if __name__ == '__main__':
-    torch.cuda.set_device(2)
+    # torch.cuda.set_device(2)
     opt = opts().parse()
     main(opt)
