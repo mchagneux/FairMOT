@@ -24,7 +24,7 @@ def demo(opt):
     logger.info('Starting tracking...')
 
     if len(opt.input_video):
-        dataloader = datasets.LoadVideo(opt.input_video, opt.img_size, skip_frames=1)
+        dataloader = datasets.LoadVideo(opt.input_video, opt.img_size, skip_frames=0)
     else: 
         dataloader = datasets.LoadImages
     result_filename = os.path.join(result_root, 'results.txt')
@@ -51,6 +51,6 @@ def demo(opt):
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
     opt = opts().init()
     demo(opt)

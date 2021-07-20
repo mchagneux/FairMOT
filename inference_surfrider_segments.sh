@@ -1,9 +1,9 @@
-# export CUDA_VISIBLE_DEVICES=0
-dataset_dir='/home/infres/chagneux/repos/surfnet/data/validation_videos/T2/long_segments/videos'
+export CUDA_VISIBLE_DEVICES=2
+dataset_dir='/home/infres/chagneux/repos/surfnet/data/validation_videos/all/short_segments_6fps/videos'
 cd ${dataset_dir}
-output_dir_name=surfrider_T2_epoch_290
+output_dir_name=surfrider_short_segments_6fps
 for f in *.mp4; do
-    echo $f
+    echo $
     cd ~/repos/FairMOT
     base_name="${f%.*}"
     echo $base_name
@@ -11,7 +11,7 @@ for f in *.mp4; do
 
     python src/demo.py mot \
         --load_model exp/mot/surfrider_1070_images_290_epochs/model_290.pth \
-        --conf_thres 0.45 \
+        --conf_thres 0.4 \
         --input-video ${dataset_dir}/$f \
         --output-root ./${dir_for_video} \
         --not_reg_offset
@@ -27,6 +27,5 @@ for f in *.mp4; do
     rm -rf ${dir_for_video}/frame
     mv saved_detections.pickle ${dir_for_video}/saved_detections.pickle
     mv saved_frames.pickle ${dir_for_video}/saved_frames.pickle
-
 done
 
