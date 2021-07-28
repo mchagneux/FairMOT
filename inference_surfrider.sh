@@ -1,10 +1,10 @@
 export CUDA_VISIBLE_DEVICES=2
-dataset_dir='/home/infres/chagneux/repos/surfnet/data/validation_videos/all/long_segments/videos'
+dataset_dir='/home/infres/chagneux/repos/surfnet/data/validation_videos/all/long_segments_12fps/videos'
 cd ${dataset_dir}
-output_dir_name=surfrider_long_segments
+output_dir_name=surfrider_test
 for f in *.mp4; do
     echo $f
-    cd ~/repos/FairMOT
+    cd ~/repos/surfnet/external/FairMOT
     base_name="${f%.*}"
     echo $base_name
     dir_for_video=$output_dir_name/${base_name}
@@ -27,6 +27,5 @@ for f in *.mp4; do
     rm -rf ${dir_for_video}/frame
     mv saved_detections.pickle ${dir_for_video}/saved_detections.pickle
     mv saved_frames.pickle ${dir_for_video}/saved_frames.pickle
-
 done
 
