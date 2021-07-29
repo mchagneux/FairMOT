@@ -7,4 +7,4 @@ __pycache__/
 DCNv2/
 src/data/surfrider/
 surfrider_*/
-tracking_results/
+results/
