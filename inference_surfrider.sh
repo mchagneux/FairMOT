@@ -1,12 +1,12 @@
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 cwd=$(pwd)
 
-fps=6
-sequences=long
-dataset_dir=../../data/validation_videos/all/${sequences}_segments_${fps}fps/videos
-external_detections_path=../../data/external_detections/FairMOT/${sequences}_segments_${fps}fps
+fps=12
+sequences=short
+dataset_dir=../../data/validation_videos/all/new_${sequences}_segments_${fps}fps/videos
+external_detections_path=../../data/external_detections/FairMOT/new_${sequences}_segments_${fps}fps
 cd ${dataset_dir}
-output_dir_name=results/${sequences}_segments_${fps}fps
+output_dir_name=results/new_${sequences}_segments_${fps}fps
 
 for f in *.mp4; do
     cd $cwd
@@ -18,8 +18,7 @@ for f in *.mp4; do
         --load_model exp/mot/surfrider_1070_images_290_epochs/model_290.pth \
         --conf_thres 0.4 \
         --input-video ${dataset_dir}/$f \
-        --output-root ./${dir_for_video} \
-        --not_reg_offset
+        --output-root ./${dir_for_video}
 
     clean=0
     python remap_ids.py --input_file  ./${dir_for_video}/results.txt --min_len_tracklet $clean --output_name $f
